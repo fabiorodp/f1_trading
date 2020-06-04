@@ -118,7 +118,7 @@ def _get_data(ticker, quarterly, ascending):
         df.index.name = 'Data'
         df.columns.name = ticker
         df = df.loc[df.index.notnull()]
-        df.index = pd.to_datetime(df.index, format='%Y-%m-%d')
+        df.index = pd.to_datetime(df.index, format='%d/%m/%Y')
 
         if not quarterly:
             rows_to_drop = [x for x in df.index.year

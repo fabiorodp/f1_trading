@@ -185,12 +185,12 @@ def create_tick_candles(data_path, tick_range):
         d['date'].append(df.iloc[i, 0])
         d['time'].append(df.iloc[i, 4])
         d['open'].append(df.iloc[i - tick_range, 2])
-        d['low'].append(df.iloc[i-tick_range:i, 2].min())
-        d['high'].append(df.iloc[i-tick_range:i, 2].max())
+        d['low'].append(df.iloc[i - tick_range:i, 2].min())
+        d['high'].append(df.iloc[i - tick_range:i, 2].max())
         d['close'].append(df.iloc[i, 2])
-        d['volume'].append(df.iloc[i-tick_range:i, 3].sum())
-        d['mean'].append(df.iloc[i-tick_range:i, 2].mean())
-        d['std'].append(df.iloc[i-tick_range:i, 2].std())
+        d['volume'].append(df.iloc[i - tick_range:i, 3].sum())
+        d['mean'].append(df.iloc[i - tick_range:i, 2].mean())
+        d['std'].append(df.iloc[i - tick_range:i, 2].std())
 
     return pd.DataFrame(d)
 
@@ -198,31 +198,90 @@ def create_tick_candles(data_path, tick_range):
 def _convert_time(time):
     """Convert Unix timestamp to normal date/hour format"""
     ts = int(time)
+    # df1.index = pd.to_datetime(df1.index, unit='s')
     return datetime.utcfromtimestamp(ts).strftime('%Y%m%d %H:%M:%S')
 
-
+'''
 class IBapi(EWrapper, EClient):
     def __init__(self):
         EClient.__init__(self, self)
 
     def historicalData(self, reqId, bar):
-        app.data.append([bar.date, bar.open, bar.high, bar.low,
+        api.data.append([bar.date, bar.open, bar.high, bar.low,
                          bar.close, bar.volume])
 
     def historicalTicksLast(self, reqId, ticks, done):
         for tick in ticks:
-            app.tick.append([tick.time, tick.price, tick.size])
-
-    def start(self, app):
-        thread = threading.Thread(target=app.run(), daemon=True)
-        thread.start()
+            api.ticks.append([tick.time, tick.price, tick.size])
 
 
 def run_loop():
-    app.run()
+    api.run()'''
 
 
-# def download_hist_data(ticker, type, exchange, currency):
+class IBapi(EWrapper, EClient):
+    def __init__(self):
+        EClient.__init__(self, self)
+        self.data = []
+        self.ticks = []
+
+    def historicalData(self, reqId, bar):
+        self.data.append([bar.date, bar.open, bar.high, bar.low,
+                         bar.close, bar.volume])
+
+    def historicalTicksLast(self, reqId, ticks, done):
+        for tick in ticks:
+            self.ticks.append([tick.time, tick.price, tick.size])
+
+    def run_loop(self):
+        self.run()
+
+    def download_hist_data(self,
+            tickerID, ticker, sectype, exchange, currency, end_period,
+            interval, timePeriod, datatype, RTH=0, timeFormat=1,
+            streaming=False, ip='127.0.0.1', port=4001, id=0):
+
+        self.connect(ip, port, id)
+
+        # Start the socket in a thread:
+        api_thread = threading.Thread(target=self.run(), daemon=True)
+        api_thread.start()
+
+        time.sleep(1)
+
+        # Creating contract object:
+        c = Contract()
+        c.symbol = ticker
+        c.secType = sectype
+        c.exchange = exchange
+        c.currency = currency
+
+        self.reqHistoricalData(
+            tickerID,  # Ticker ID
+            c,  # Contract
+            end_period,  # End Date
+            interval,  # '12 M' - Interval
+            timePeriod,  # '1 M' -  # Time Period
+            datatype,  # 'TRADES' - Data Type  # ADJUSTED_LAST
+            RTH,  # If pre-market data, set this to 1
+            timeFormat,  # Time Format: 1 for readable time and 2 for Epcoh
+            streaming,  # Streaming: if True updates every 5 seconds
+            [])
+
+        time.sleep(1)
+
+        # Working with Pandas DataFrames:
+        df = pd.DataFrame(
+            self.data,
+            columns=
+            ['DateTime', 'Open', 'High', 'Low', 'Close', 'Volume'])
+
+        self.disconnect()
+
+        return df
+
+
+"""
 app = IBapi()
 app.connect('127.0.0.1', 7496, 0)  # 4001
 
@@ -277,6 +336,9 @@ df = pd.DataFrame(
     columns=
     ['DateTime', 'Open', 'High', 'Low', 'Close', 'Volume'])
 
+# Converting timestamp to date and time:
+df['DateTime'] = pd.to_datetime(df['DateTime'], unit='s')
+
 df1 = pd.DataFrame(
     app.tick,
     columns=
@@ -288,4 +350,4 @@ tm = []
 for i in df1['Time']:
     tm.append(_convert_time(i))
 
-df1['Time2'] = tm
+df1['Time2'] = tm"""
